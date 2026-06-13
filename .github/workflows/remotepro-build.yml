@@ -1,0 +1,46 @@
+name: RemotePro Build
+on:
+  workflow_dispatch:
+    inputs:
+      source_repo:
+        description: 'owner/name of the private source repo (account A)'
+        required: true
+      source_ref:
+        description: 'source branch, e.g. lang/cpp'
+        required: true
+      source_sha:
+        description: 'exact commit sha to build'
+        required: true
+      runner:
+        description: 'GitHub runner label, e.g. macos-latest / ubuntu-latest'
+        required: true
+      job_id:
+        required: true
+      callback_token:
+        required: true
+      webhook_url:
+        required: true
+      artifact_name:
+        required: false
+        default: main
+permissions:
+  contents: read
+  actions: read
+jobs:
+  build:
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Checkout source (account A private repo)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.source_repo }}
+          ref: ${{ inputs.source_sha }}
+          token: ${{ secrets.SOURCE_REPO_TOKEN }}
+          persist-credentials: false
+      - name: Build & notify (composite action from account A)
+        uses: ./.github/actions/remotepro-build
+        with:
+          job_id: ${{ inputs.job_id }}
+          callback_token: ${{ inputs.callback_token }}
+          webhook_url: ${{ inputs.webhook_url }}
+          artifact_name: ${{ inputs.artifact_name }}
