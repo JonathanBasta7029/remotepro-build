@@ -37,10 +37,63 @@ jobs:
           ref: ${{ inputs.source_sha }}
           token: ${{ secrets.SOURCE_REPO_TOKEN }}
           persist-credentials: false
-      - name: Build & notify (composite action from account A)
+      - name: Build (composite action from account A)
+        id: build
         uses: ./.github/actions/remotepro-build
+      - name: Notify compile server
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+          CALLBACK_TOKEN: ${{ inputs.callback_token }}
+          WEBHOOK_URL: ${{ inputs.webhook_url }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
         with:
-          job_id: ${{ inputs.job_id }}
-          callback_token: ${{ inputs.callback_token }}
-          webhook_url: ${{ inputs.webhook_url }}
-          artifact_name: ${{ inputs.artifact_name }}
+          script: |
+            const conclusion = process.env.BUILD_OUTCOME === 'success' ? 'success' : 'failure';
+            const runId = context.runId;
+            const { owner, repo } = context.repo;
+            const runUrl = process.env.GITHUB_SERVER_URL + '/' + owner + '/' + repo + '/actions/runs/' + runId;
+
+            async function collectFailedSteps() {
+              if (conclusion === 'success') return null;
+              try {
+                const { data } = await github.rest.actions.listJobsForWorkflowRun({ owner, repo, run_id: runId });
+                const result = [];
+                for (const job of data.jobs) {
+                  const failed = (job.steps ?? [])
+                    .filter((step) => step.conclusion === 'failure')
+                    .map((step) => step.name);
+                  if (failed.length) result.push(job.name + ' - ' + failed.join(', '));
+                  else if (job.conclusion === 'failure') result.push(job.name + ' (failed)');
+                }
+                return result.length ? result : null;
+              } catch (error) {
+                core.warning('collect failed steps error: ' + error);
+                return null;
+              }
+            }
+
+            const payload = {
+              jobId: process.env.JOB_ID,
+              token: process.env.CALLBACK_TOKEN,
+              status: 'completed',
+              conclusion,
+              runId,
+              runUrl,
+              failedSteps: await collectFailedSteps(),
+              errorLog: null
+            };
+
+            const headers = new Headers();
+            headers.set('Content-Type', 'application/json');
+            const response = await fetch(process.env.WEBHOOK_URL, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+              const body = await response.text();
+              throw new Error('webhook failed: ' + response.status + ' ' + body);
+            }
+
