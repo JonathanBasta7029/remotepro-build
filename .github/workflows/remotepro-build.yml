@@ -1,7 +1,11 @@
 name: RemotePro Build
+run-name: ${{ inputs.run_name }}
 on:
   workflow_dispatch:
     inputs:
+      run_name:
+        description: 'workflow run display title (repo · branch · short sha)'
+        required: true
       source_repo:
         description: 'owner/name of the private source repo (account A)'
         required: true
