@@ -34,14 +34,13 @@ jobs:
   build:
     runs-on: ${{ inputs.runner }}
     steps:
-      - name: Checkout source (account A private repo)
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           repository: ${{ inputs.source_repo }}
           ref: ${{ inputs.source_sha }}
           token: ${{ secrets.SOURCE_REPO_TOKEN }}
           persist-credentials: false
-      - name: Build & notify (composite action from account A)
+      - name: Build & notify
         uses: ./.github/actions/remotepro-build
         with:
           job_id: ${{ inputs.job_id }}
