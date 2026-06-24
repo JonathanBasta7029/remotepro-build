@@ -35,7 +35,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - name: Checkout source (account A private repo)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ inputs.source_repo }}
           ref: ${{ inputs.source_sha }}
